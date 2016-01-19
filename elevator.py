@@ -72,15 +72,18 @@ statechart:
 elevator = io.import_from_yaml(elevator_yaml)
 
 mutants = list()
-# mutator1 = mutator.StateMissing(elevator)
-# mutants.extend(mutator1.mutate())
+mutator1 = mutator.StateMissing(elevator)
+mutants.extend(mutator1.mutate())
+print(len(mutants))
 
-# mutator2 = mutator.ArcMissing(elevator)
-# mutants.extend(mutator2.mutate())
+mutator2 = mutator.ArcMissing(elevator)
+mutants.extend(mutator2.mutate())
+print(len(mutants))
 
 
 mutator3 = mutator.WrongStartingState(elevator)
 mutants.extend(mutator3.mutate())
+print(len(mutants))
 
 
 

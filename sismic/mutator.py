@@ -28,15 +28,15 @@ class StateMissing(Mutator):
 
             assert isinstance(new_mutant, model.Statechart)
 
-            transition_list = new_mutant.transitions_from(state_key)
-            transition_list.extend(new_mutant.transitions_to(state_key))
-
-            for transition in transition_list:
-                try:
-                    new_mutant.remove_transition(transition)
-
-                except:
-                    continue
+            # transition_list = new_mutant.transitions_from(state_key)
+            # transition_list.extend(new_mutant.transitions_to(state_key))
+            #
+            # for transition in transition_list:
+            #     try:
+            #         new_mutant.remove_transition(transition)
+            #
+            #     except:
+            #         continue
                     # print("\nERROR: \n", err)
                     # print("\nLIST: \n", transition_list)
 
@@ -106,10 +106,15 @@ class WrongStartingState(Mutator):
                 for state_name in state_names:
                     new_mutant = self.separate_instance()
                     new_mutant.mutator_type = self.mutator_type
+
                     assert isinstance(new_mutant, model.Statechart)
-                    # print(state_key, new_mutant.state_for(state_key).initial)
+
                     new_mutant.state_for(state_key).initial = state_name
-                    # print(state_key, new_mutant.state_for(state_key).initial)
+
+                    try:
+                        new_mutant.validate()
+                    except:
+                        continue
 
                     mutants.append(new_mutant)
 
