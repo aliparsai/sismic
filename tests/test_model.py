@@ -107,6 +107,31 @@ class TraversalTests(unittest.TestCase):
             io.import_from_yaml(yaml)
 
 
+class ValidateTests(unittest.TestCase):
+    # REMARK: "Positive" tests are already done during io.import_from_yaml!
+    def test_history_memory(self):
+        statechart = io.import_from_yaml(open('tests/yaml/history.yaml'))
+        memory = statechart.state_for('loop.H').memory
+
+        statechart.state_for('loop.H').memory = 'unknown'
+        with self.assertRaises(exceptions.StatechartError) as cm:
+            statechart._validate_historystate_memory()
+
+        statechart.state_for('loop.H').memory = memory
+        statechart._validate_historystate_memory()
+
+    def test_compound_initial(self):
+        statechart = io.import_from_yaml(open('tests/yaml/composite.yaml'))
+        initial = statechart.state_for('s1b').initial
+
+        statechart.state_for('s1b').initial = 'unknown'
+        with self.assertRaises(exceptions.StatechartError) as cm:
+            statechart._validate_compoundstate_initial()
+
+        statechart.state_for('s1b').initial = initial
+        statechart._validate_compoundstate_initial()
+
+
 class TransitionsTests(unittest.TestCase):
     def setUp(self):
         self.sc = io.import_from_yaml(open('tests/yaml/internal.yaml'))
@@ -189,6 +214,13 @@ class TransitionRotationTests(unittest.TestCase):
     def test_rotate_both(self):
         tr = list(filter(lambda t: t.source == 's1', self.sc.transitions))[0]
 
+        self.sc.rotate_transition(tr, new_source='s1', new_target='s2')
+        self.assertEqual(tr.source, 's1')
+        self.assertEqual(tr.target, 's2')
+
+    def test_rotate_both_inexistant(self):
+        tr = list(filter(lambda t: t.source == 's1', self.sc.transitions))[0]
+
         with self.assertRaises(ValueError):
             self.sc.rotate_transition(tr)
 
@@ -198,13 +230,8 @@ class TransitionRotationTests(unittest.TestCase):
         with self.assertRaises(exceptions.StatechartError):
             self.sc.rotate_transition(tr, new_source='s2', new_target='s2')
 
-        self.sc.rotate_transition(tr, new_source='s1', new_target='s2')
-        self.assertEqual(tr.source, 's1')
-        self.assertEqual(tr.target, 's2')
-
-        self.sc.rotate_transition(tr, new_source='active', new_target='s1')
-        self.assertEqual(tr.source, 'active')
-        self.assertEqual(tr.target, 's1')
+    def test_rotate_both_with_internal(self):
+        tr = list(filter(lambda t: t.source == 's1', self.sc.transitions))[0]
 
         self.sc.rotate_transition(tr, new_source='s1', new_target=None)
         self.assertEqual(tr.source, 's1')
@@ -212,20 +239,28 @@ class TransitionRotationTests(unittest.TestCase):
         self.assertTrue(tr.internal)
 
 
-class RemovalTests(unittest.TestCase):
+class RemoveTransitionsTests(unittest.TestCase):
     def setUp(self):
         self.sc = io.import_from_yaml(open('tests/yaml/internal.yaml'))
 
-    def test_remove_transitions(self):
+    def test_remove_existing_transition(self):
         transitions = self.sc.transitions
         for transition in transitions:
             self.sc.remove_transition(transition)
         self.assertEqual(len(self.sc.transitions), 0)
 
+    def test_remove_unexisting_transition(self):
         with self.assertRaises(exceptions.StatechartError):
             self.sc.remove_transition(None)
+        with self.assertRaises(exceptions.StatechartError):
+            self.sc.remove_transition(model.Transition('a', 'b'))
 
-    def test_remove_states(self):
+
+class RemoveStatesTests(unittest.TestCase):
+    def setUp(self):
+        self.sc = io.import_from_yaml(open('tests/yaml/internal.yaml'))
+
+    def test_remove_existing_state(self):
         self.sc.remove_state('active')
 
         self.assertTrue('active' not in self.sc.states)
@@ -241,33 +276,37 @@ class RemovalTests(unittest.TestCase):
                 nb_transitions += 1
         self.assertEqual(nb_transitions, 0)
 
+    def test_remove_unexisting_state(self):
         with self.assertRaises(exceptions.StatechartError):
             self.sc.remove_state('unknown')
 
-        with self.assertRaises(exceptions.StatechartError):
-            self.sc.remove_state('s2')
+    def test_remove_root_state(self):
+        self.sc.remove_state('root')
+        self.assertEqual(len(self.sc.transitions), 0)
+        self.assertEqual(len(self.sc.states), 0)
 
+    def test_remove_appropriate_state(self):
+        self.sc.remove_state('active')
         self.sc.remove_state('s1')
         self.sc.remove_state('s2')
 
 
-class RenameStateTests(unittest.TestCase):
+class RenameStatesTests(unittest.TestCase):
     def setUp(self):
         self.sc = io.import_from_yaml(open('tests/yaml/internal.yaml'))
 
-    def test_unknown(self):
+    def test_rename_unexisting_state(self):
         with self.assertRaises(KeyError):
             self.sc.rename_state('unknown', 's3')
 
-    def test_rename_with_self(self):
-        with self.assertRaises(exceptions.StatechartError):
-            self.sc.rename_state('s2', 's2')
+    def test_do_not_change_name(self):
+        self.sc.rename_state('s2', 's2')
 
-    def test_rename_with_existing(self):
+    def test_rename_to_an_existing_state(self):
         with self.assertRaises(exceptions.StatechartError):
             self.sc.rename_state('s2', 's1')
 
-    def test_rename(self):
+    def test_rename_simple(self):
         self.sc.rename_state('active', 's3')
         self.assertTrue('s3' in self.sc.states)
         self.assertFalse('active' in self.sc.states)
@@ -293,6 +332,12 @@ class RenameStateTests(unittest.TestCase):
         self.assertTrue(len(self.sc.transitions_from('s3')), 1)
         self.assertTrue(len(self.sc.transitions_to('s2')), 1)
 
-    def test_rename_with_initial(self):
+    def test_rename_change_initial(self):
         self.sc.rename_state('active', 's3')
         self.assertEqual(self.sc.state_for('root').initial, 's3')
+
+    def test_rename_change_memory(self):
+        self.sc = io.import_from_yaml(open('tests/yaml/history.yaml'))
+        self.sc.state_for('loop.H').memory = 's1'
+        self.sc.rename_state('s1', 's4')
+        self.assertEqual(self.sc.state_for('loop.H').memory, 's4')
