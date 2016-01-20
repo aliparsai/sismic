@@ -1,289 +1,7 @@
+from .elements import *
 from sismic.exceptions import StatechartError
 
-__all__ = ['Event', 'InternalEvent',
-           'ContractMixin', 'StateMixin', 'ActionStateMixin', 'TransitionStateMixin', 'CompositeStateMixin', 'HistoryStateMixin',
-           'BasicState', 'CompoundState', 'OrthogonalState', 'ShallowHistoryState', 'DeepHistoryState', 'FinalState',
-           'Transition',
-           'Statechart',
-           'MicroStep', 'MacroStep']
-
-
-class Event:
-    """
-    Simple event with a name and (optionally) some data.
-    Unless the attribute already exists, each key from *data* is exposed as an attribute
-    of this class.
-
-    :param name: Name of the event
-    :param data: additional data (mapping, dict-like)
-    """
-
-    def __init__(self, name: str, **additional_parameters):
-        self.name = name
-        self.data = additional_parameters
-
-    def __eq__(self, other):
-        return isinstance(other, Event) and \
-               self.name == other.name and \
-               self.data == other.data
-
-    def __getattr__(self, attr):
-        try:
-            return self.data[attr]
-        except:
-            raise AttributeError('{} has no attribute {}'.format(self, attr))
-
-    def __hash__(self):
-        return hash(self.name)
-
-    def __repr__(self):
-        if self.data:
-            return '{}({}, {})'.format(self.__class__.__name__, self.name, ', '.join('{}={}'.format(k, v) for k,v in self.data.items()))
-        else:
-            return '{}({})'.format(self.__class__.__name__, self.name)
-
-
-class InternalEvent(Event):
-    """
-    Subclass of Event that represents an internal event.
-    """
-    pass
-
-
-class ContractMixin:
-    """
-    Mixin with a contract: preconditions, postconditions and invariants.
-    """
-
-    def __init__(self):
-        self.preconditions = []
-        self.postconditions = []
-        self.invariants = []
-
-
-class StateMixin:
-    """
-    State element with a name.
-
-    :param name: name of the state
-    """
-
-    def __init__(self, name: str):
-        self._name = name
-
-    @property
-    def name(self):
-        return self._name
-
-    def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self.name)
-
-    def __eq__(self, other):
-        return isinstance(other, StateMixin) and self.name == other.name
-
-    def __hash__(self):
-        return hash(self.name)
-
-
-class ActionStateMixin:
-    """
-    State that can define actions on entry and on exit.
-
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    """
-
-    def __init__(self, on_entry: str = None, on_exit: str = None):
-        self.on_entry = on_entry
-        self.on_exit = on_exit
-
-
-class TransitionStateMixin:
-    """
-    A simple state can host transitions
-    """
-    pass
-
-
-class CompositeStateMixin:
-    """
-    Composite state can have children states.
-    """
-    pass
-
-
-class HistoryStateMixin:
-    """
-    History state has a memory that can be resumed.
-
-    :param memory: name of the initial state
-    """
-
-    def __init__(self, memory: str = None):
-        self.memory = memory
-
-
-class BasicState(ContractMixin, StateMixin, ActionStateMixin, TransitionStateMixin):
-    """
-    A basic state, with a name, transitions, actions, etc. but no child state.
-
-    :param name: name of this state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    """
-
-    def __init__(self, name: str, on_entry: str = None, on_exit: str = None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-        TransitionStateMixin.__init__(self)
-
-
-class CompoundState(ContractMixin, StateMixin, ActionStateMixin, TransitionStateMixin, CompositeStateMixin):
-    """
-    Compound states must have children states.
-
-    :param name: name of this state
-    :param initial: name of the initial state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    """
-
-    def __init__(self, name: str, initial: str = None, on_entry: str = None, on_exit: str = None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-        TransitionStateMixin.__init__(self)
-        CompositeStateMixin.__init__(self)
-        self.initial = initial
-
-
-class OrthogonalState(ContractMixin, StateMixin, ActionStateMixin, TransitionStateMixin, CompositeStateMixin):
-    """
-    Orthogonal states run their children simultaneously.
-
-    :param name: name of this state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    """
-
-    def __init__(self, name: str, on_entry: str = None, on_exit: str = None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-        TransitionStateMixin.__init__(self)
-        CompositeStateMixin.__init__(self)
-
-
-class ShallowHistoryState(ContractMixin, StateMixin, ActionStateMixin, HistoryStateMixin):
-    """
-    A shallow history state resumes the execution of its parent.
-    It activates the latest visited state of its parent.
-
-    :param name: name of this state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    :param memory: name of the initial state
-    """
-    def __init__(self, name: str, on_entry: str=None, on_exit: str=None, memory: str=None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-        HistoryStateMixin.__init__(self, memory)
-
-
-class DeepHistoryState(ContractMixin, StateMixin, ActionStateMixin, HistoryStateMixin):
-    """
-    A deep history state resumes the execution of its parent, and of every nested
-    active states in its parent.
-
-    :param name: name of this state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    :param memory: name of the initial state
-    """
-    def __init__(self, name: str, on_entry: str=None, on_exit: str=None, memory: str=None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-        HistoryStateMixin.__init__(self, memory)
-
-
-class FinalState(ContractMixin, StateMixin, ActionStateMixin):
-    """
-    Final state has NO transition and is used to detect state machine termination.
-
-    :param name: name of this state
-    :param on_entry: code to execute when state is entered
-    :param on_exit: code to execute when state is exited
-    """
-
-    def __init__(self, name: str, on_entry: str = None, on_exit: str = None):
-        ContractMixin.__init__(self)
-        StateMixin.__init__(self, name)
-        ActionStateMixin.__init__(self, on_entry, on_exit)
-
-
-class Transition(ContractMixin):
-    """
-    Represent a transition from a source state to a target state.
-
-    A transition can be eventless (no event) or internal (no target).
-    A condition (code as string) can be specified as a guard.
-
-    :param source: name of the source state
-    :param target: name of the target state (if transition is not internal)
-    :param event: event name (if any)
-    :param guard: condition as code (if any)
-    :param action: action as code (if any)
-    """
-
-    def __init__(self, source: str, target: str = None, event: str = None, guard: str = None, action: str = None):
-        ContractMixin.__init__(self)
-        self._source = source
-        self._target = target
-        self.event = event
-        self.guard = guard
-        self.action = action
-
-    @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
-
-    @property
-    def internal(self):
-        """
-        Boolean indicating whether this transition is an internal transition.
-        """
-        return self._target is None
-
-    @property
-    def eventless(self):
-        """
-        Boolean indicating whether this transition is an eventless transition.
-        """
-        return self.event is None
-
-    def __eq__(self, other):
-        return (isinstance(other, Transition) and
-                self.source == other.source and
-                self.target == other.target and
-                self.event == other.event and
-                self.guard == other.guard and
-                self.action == other.action)
-
-    def __repr__(self):
-        return 'Transition({0}, {1}, {2})'.format(self.source, self.target, self.event)
-
-    def __str__(self):
-        return '{} [{}] -> '.format(self.source, self.event, self.target if self.target else '')
-
-    def __hash__(self):
-        return hash(self.source)
+__all__ = ['Statechart']
 
 
 class Statechart:
@@ -302,17 +20,17 @@ class Statechart:
 
         self._states = {}  # name -> State object
         self._parent = {}  # name -> parent.name
-        self._children = {}  # name -> list of names
+        self._children = {None: []}  # name -> list of names
         self._transitions = []  # list of Transition objects
-
-        self._root = None  # Root state
 
     @property
     def root(self):
         """
         Root state name
         """
-        return self._root.name
+        for name, parent in self._parent.items():
+            if parent is None:
+                return name
 
     @property
     def preamble(self):
@@ -345,9 +63,8 @@ class Statechart:
 
         if not parent:
             # Check root state
-            if self._root:
+            if self.root:
                 raise StatechartError('Root is already defined, {} should declare an existing parent state'.format(state))
-            self._root = state
         else:
             parent_state = self.state_for(parent)
 
@@ -366,9 +83,8 @@ class Statechart:
         # Save state
         self._states[state.name] = state
         self._parent[state.name] = parent
-
-        if parent:
-            self._children.setdefault(parent, []).append(state.name)
+        self._children[state.name] = []
+        self._children[parent].append(state.name)
 
     def remove_state(self, name: str):
         """
@@ -384,7 +100,7 @@ class Statechart:
         state = self.state_for(name)
 
         # Remove children
-        for child in self.children_for(state.name):
+        for child in list(self.children_for(state.name)):
             self.remove_state(child)
 
         # Remove transitions
@@ -400,19 +116,11 @@ class Statechart:
                 other_state.memory = None
 
         # Remove state
-        try:
-            self._children.pop(name)
-        except KeyError:
-            pass
-        try:
-            self._parent.pop(name)
-        except KeyError:
-            pass
-
         self._states.pop(name)
+        parent = self._parent.pop(name)
+        self._children.pop(name)
 
-        if self.root == state.name:
-            self._root = None
+        self._children[parent].remove(name)
 
     def rename_state(self, old_name: str, new_name: str):
         """
@@ -452,13 +160,55 @@ class Statechart:
             if self._parent[other_state.name] == old_name:
                 self._parent[other_state.name] = new_name
 
-        # Rename
-        state._name = new_name
+        # Renaming
+        parent_name = self._parent[old_name]
+
         self._states[new_name] = self._states.pop(old_name)
-        try:
-            self._children[new_name] = self._children.pop(old_name)
-        except KeyError:
-            pass
+        self._parent[new_name] = self._parent.pop(old_name)
+        self._children[new_name] = self._children.pop(old_name)
+
+        self._children[parent_name].remove(old_name)
+        self._children[parent_name].append(new_name)
+
+    def move_state(self, name: str, new_parent: str):
+        """
+        Move given state (and its children) such that its new parent is *new_parent*.
+
+        Notice that a state cannot be moved inside itself or inside one of its descendants.
+        If the state to move is the target of an *initial* or *memory* property of its parent,
+        this property will be set to None. The same occurs if given state is an history state.
+
+        :param name: name of the state to move
+        :param new_parent: name of the new parent
+        """
+        # Check that both states exist
+        state = self.state_for(name)
+        new_parent_state = self.state_for(new_parent)
+
+        # Check that parent is not a descendant (or self) of given state
+        if new_parent in [name] + self.descendants_for(name):
+            raise StatechartError('State {} cannot be moved into itself or one of its descendant.'.format(state))
+
+        # Change its parent and register state as a child
+        old_parent = self.parent_for(name)
+        self._parent[name] = new_parent
+        self._children[old_parent].remove(name)
+        self._children.setdefault(new_parent, []).append(name)
+
+        # Check memory property
+        if isinstance(state, HistoryStateMixin):
+            state.memory = None
+
+        for other_state in self._states.values():
+            # Change initial (CompoundState)
+            if isinstance(other_state, CompoundState):
+                if other_state.initial == name:
+                    other_state.initial = None
+
+            # Change memory (HistoryState)
+            if isinstance(other_state, HistoryStateMixin):
+                if other_state.memory == name:
+                    other_state.memory = None
 
     def state_for(self, name: str) -> StateMixin:
         """
@@ -496,7 +246,7 @@ class Statechart:
         """
         self.state_for(name)  # Raise StatechartError if state does not exist
 
-        return self._children.get(name, [])
+        return self._children[name]
 
     def ancestors_for(self, name: str) -> list:
         """
@@ -750,6 +500,8 @@ class Statechart:
     def _validate_compoundstate_initial(self):
         """
         Checks that every *CompoundState*'s initial state refer to one of its children
+
+        :return: True
         :raise StatechartError:
         """
         for name, state in self._states.items():
@@ -758,119 +510,33 @@ class Statechart:
                     raise StatechartError('Initial state {} of {} does not exist'.format(state.initial, state))
                 if not state.initial in self.children_for(name):
                     raise StatechartError('Initial state {} of {} must be a child state'.format(state.initial, state))
+        return True
 
     def _validate_historystate_memory(self):
         """
         Checks that every *HistoryStateMixin*'s memory refer to one of its parent's children
 
+        :return: True
         :raise StatechartError:
         """
         for name, state in self._states.items():
             if isinstance(state, HistoryStateMixin) and state.memory:
-                if not state.memory in self._states:
+                if state.memory not in self._states:
                     raise StatechartError('Initial memory {} of {} does not exist'.format(state.memory, state))
-                if not state.memory in self.children_for(self.parent_for(name)):
+                if state.memory not in self.children_for(self.parent_for(name)):
                     raise StatechartError('Initial memory {} of {} must be a child of its parent'.format(state.memory, state))
+        return True
 
     def validate(self):
         """
         Checks that every *CompoundState*'s initial state refer to one of its children
         Checks that every *HistoryStateMixin*'s memory refer to one of its parent's children
 
+        :return: True
         :raise StatechartError:
         """
         self._validate_compoundstate_initial()
         self._validate_historystate_memory()
 
+        return True
 
-class MicroStep:
-    """
-    Create a micro step.
-
-    A step consider *event*, takes a *transition* and results in a list
-    of *entered_states* and a list of *exited_states*.
-    Order in the two lists is REALLY important!
-
-    :param event: Event or None in case of eventless transition
-    :param transition: a *Transition* or None if no processed transition
-    :param entered_states: possibly empty list of entered states
-    :param exited_states: possibly empty list of exited states
-    """
-
-    def __init__(self, event: Event = None, transition: Transition = None,
-                 entered_states: list = None, exited_states: list = None):
-        self.event = event
-        self.transition = transition if transition else []
-        self.entered_states = entered_states if entered_states else []
-        self.exited_states = exited_states if exited_states else []
-
-    def __repr__(self):
-        return 'MicroStep({}, {}, >{}, <{})'.format(self.event, self.transition, self.entered_states, self.exited_states)
-
-
-class MacroStep:
-    """
-    A macro step is a list of micro steps.
-
-    :param time: the time at which this step was executed
-    :param steps: a list of *MicroStep* instances
-    """
-
-    def __init__(self, time: int, steps: list):
-        self._time = time
-        self._steps = steps
-
-    @property
-    def steps(self):
-        """
-        List of micro steps
-        """
-        return self._steps
-
-    @property
-    def time(self):
-        """
-        Time at which this step was executed.
-        """
-        return self._time
-
-    @property
-    def event(self) -> Event:
-        """
-        Event (or *None*) that were consumed.
-        """
-        for step in self._steps:
-            if step.event:
-                return step.event
-        return None
-
-    @property
-    def transitions(self) -> list:
-        """
-        A (possibly empty) list of transitions that were triggered.
-        """
-        return [step.transition for step in self._steps if step.transition]
-
-    @property
-    def entered_states(self) -> list:
-        """
-        List of the states names that were entered.
-        """
-        states = []
-        for step in self._steps:
-            states += step.entered_states
-        return states
-
-    @property
-    def exited_states(self) -> list:
-        """
-        List of the states names that were exited.
-        """
-        states = []
-        for step in self._steps:
-            states += step.exited_states
-        return states
-
-    def __repr__(self):
-        return 'MacroStep@{}({}, {}, >{}, <{})'.format(round(self.time, 3), self.event, self.transitions,
-                                                       self.entered_states, self.exited_states)
