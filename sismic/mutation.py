@@ -1,5 +1,47 @@
 from sismic import model
+from sismic import stories
+from sismic import interpreter
 from copy import deepcopy
+
+
+class Mutation(object):
+    def __init__(self, statechart: model.Statechart = None):
+        self.statechart = statechart
+        self.mutants = list()
+        self.mutators = None
+        self.mutant_status = dict()
+
+    def create_mutants(self):
+        # summon all mutators
+        self.mutators = Mutator.__subclasses__()
+
+        # mutate the statechart by each mutator
+        for mutator in self.mutators:
+            mutator_instance = mutator(self.statechart)
+            self.mutants.extend(mutator_instance.mutate())
+
+        for mutant in self.mutants:
+            self.mutant_status[mutant] = "Survived"
+
+        # return all mutants
+        return self.mutants
+
+    @property
+    def survived_mutants(self):
+        return [mutant for mutant in self.mutants if self.mutant_status[mutant] == "Survived"]
+
+    def evaluate_story(self, story: stories.Story):
+        original_trace = story.tell(interpreter.Interpreter(self.statechart)).trace
+        kill_count = 0
+
+        for mutant in self.survived_mutants:
+            mutant_trace = story.tell(interpreter.Interpreter(mutant)).trace
+
+            if mutant_trace != original_trace:
+                self.mutant_status[mutant] = "Killed"
+                kill_count += 1
+
+        return kill_count
 
 
 class Mutator(object):
@@ -23,6 +65,9 @@ class StateMissing(Mutator):
         mutants = list()
 
         for state_key in self.statechart.states:
+            if state_key == self.statechart.root:
+                continue
+
             new_mutant = self.separate_instance()
             new_mutant.mutator_type = self.mutator_type
 
@@ -119,3 +164,4 @@ class WrongStartingState(Mutator):
                     mutants.append(new_mutant)
 
         return mutants
+

@@ -1,4 +1,6 @@
 from sismic.model import Event, InternalEvent
+from sismic import mutation
+
 import random
 
 __all__ = ['Pause', 'Story', 'random_stories_generator', 'story_from_trace']
@@ -71,6 +73,57 @@ def random_stories_generator(items, length: int=None, number: int=None):
             story.append(random.choice(items))  # Not random.sample, replacements needed
         yield story
         number -= 1
+
+
+
+def random_stories_generator_using_mutation(statechart, items, minimum_length: int=3):
+    """
+    A generator that returns random stories whose elements come from *items*.
+    Parameter *items* can be any iterable containing events and/or pauses.
+
+    :param statechart: The input statechart
+    :param items: Items to pick from
+    :param minimum_length: Minimum length of the story, or *len(items)*
+    :return: a list of mutation-adequate stories
+    """
+
+    mutation_instance = mutation.Mutation(statechart)
+    mutation_instance.create_mutants()
+
+    length = minimum_length
+    story_list = list()
+    no_new_mutants_killed = 0
+
+    discarded = 0
+
+    while len(mutation_instance.survived_mutants) > 0:
+        if no_new_mutants_killed > length**2:
+            length += 1
+            no_new_mutants_killed = 0
+
+        # print("Current Length: ", length, " Discarded: ", discarded, " Kept: ", len(story_list),
+        #       " Remaining Mutants: ", len(mutation_instance.survived_mutants))
+
+        story = Story()
+        for i in range(length):
+            story.append(random.choice(items))
+
+        if mutation_instance.evaluate_story(story) > 0:
+            story_list.append(story)
+            no_new_mutants_killed = 0
+
+        else:
+            discarded += 1
+            no_new_mutants_killed += 1
+
+
+        if length > 20:
+            break
+
+    for i in mutation_instance.survived_mutants:
+        print()
+
+    return story_list
 
 
 def story_from_trace(trace: list) -> Story:
