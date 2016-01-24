@@ -169,6 +169,7 @@ class ArcMissing(Mutator):
 
             try:
                 new_mutant.remove_transition(transition)
+                new_mutant.removed_transition = transition
 
             except:
                 continue

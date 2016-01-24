@@ -110,12 +110,11 @@ def random_stories_generator_using_mutation(statechart, items, minimum_length: i
 
     length = minimum_length
     story_list = list()
-    no_new_mutants_killed = 0
 
     discarded = 0
 
     while len(mutation_instance.survived_mutants) > 0:
-        # if length > 8:
+        # if length > 6:
         #     break
 
         all_possible_stories = list(itertools.combinations_with_replacement(items, length))
@@ -123,11 +122,6 @@ def random_stories_generator_using_mutation(statechart, items, minimum_length: i
 
         length += 1
 
-
-        #
-        # if no_new_mutants_killed > length**2:
-        #     length += 1
-        #     no_new_mutants_killed = 0
 
         print("Current Length: ", length - 1, " Discarded: ", discarded, " Kept: ", len(story_list),
               " Remaining Mutants: ", len(mutation_instance.survived_mutants))
@@ -137,18 +131,11 @@ def random_stories_generator_using_mutation(statechart, items, minimum_length: i
             random.shuffle(list(item_list))
             story.extend(item_list)
 
-        # for i in range(length):
-        #     story.append(random.choice(items))
-
-
-
             if mutation_instance.evaluate_story(story) > 0:
                 story_list.append(story)
-                # no_new_mutants_killed = 0
 
             else:
                 discarded += 1
-                # no_new_mutants_killed += 1
 
         print(story)
 
