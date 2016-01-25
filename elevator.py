@@ -85,8 +85,9 @@ elevator = io.import_from_yaml(elevator_yaml)
 # mutants.extend(mutator3.mutate())
 # print(len(mutants))
 
-event_list = elevator.events_for()
-event_list.extend([stories.Pause(10), stories.Pause(5)])
+event_name_list = elevator.events_for()
+event_list = [model.Event(event_name, floor=10) for event_name in event_name_list]
+# event_list.extend([stories.Pause(10), stories.Pause(5)])
 story_list = stories.random_stories_generator_using_mutation(elevator, event_list, 1)
 
 print(story_list)

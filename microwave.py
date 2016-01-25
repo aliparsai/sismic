@@ -109,9 +109,11 @@ microwave = io.import_from_yaml(microwave_yaml)
 # mutants.extend(mutator3.mutate())
 # print(len(mutants))
 
-event_list = microwave.events_for()
-event_list.extend([stories.Pause(1)])
-story_list = stories.random_stories_generator_using_mutation(microwave, event_list, 8)
+event_name_list = microwave.events_for()
+event_list = [model.Event(event_name) for event_name in event_name_list]
+event_list.extend(
+        [stories.Pause(1), stories.Pause(15), stories.Pause(10), stories.Pause(5), stories.Pause(4), stories.Pause(3)])
+story_list = stories.random_stories_generator_using_mutation(microwave, event_list, 1)
 
 print(story_list)
 

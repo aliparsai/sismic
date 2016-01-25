@@ -57,46 +57,54 @@ class Mutation(object):
             counter = -1
             mutant_interpreter = interpreter.Interpreter(mutant)
 
-            for item, step_mutant in story.tell_by_step(mutant_interpreter):
-                counter += 1
+            try:
+                for item, step_mutant in story.tell_by_step(mutant_interpreter):
+                    counter += 1
 
-                if steps_original[counter] != step_mutant:
-                    self.mutant_status[mutant] = "Killed"
-                    kill_count += 1
-                    break
+                    if steps_original[counter] != step_mutant:
+                        self.mutant_status[mutant] = "Killed"
+                        kill_count += 1
+                        break
 
-                if context_original[counter] != mutant_interpreter.context:
-                    self.mutant_status[mutant] = "Killed"
-                    kill_count += 1
-                    break
+                    if context_original[counter] != mutant_interpreter.context:
+                        self.mutant_status[mutant] = "Killed"
+                        kill_count += 1
+                        break
 
-                if configuration_original[counter] != mutant_interpreter.configuration:
-                    self.mutant_status[mutant] = "Killed"
-                    kill_count += 1
-                    break
+                    if configuration_original[counter] != mutant_interpreter.configuration:
+                        self.mutant_status[mutant] = "Killed"
+                        kill_count += 1
+                        break
 
-                if trace_original[counter] != mutant_interpreter.trace:
-                    self.mutant_status[mutant] = "Killed"
-                    kill_count += 1
-                    break
+                    if trace_original[counter] != mutant_interpreter.trace:
+                        self.mutant_status[mutant] = "Killed"
+                        kill_count += 1
+                        break
 
-                if time_original[counter] != mutant_interpreter.time:
-                    self.mutant_status[mutant] = "Killed"
-                    kill_count += 1
-                    break
+                    if time_original[counter] != mutant_interpreter.time:
+                        self.mutant_status[mutant] = "Killed"
+                        kill_count += 1
+                        break
+            except Exception as err:
+                # print(err)
+                # print(mutant.mutator_type)
+                # print(mutant.states)
+                # print(story)
+                self.mutant_status[mutant] = "Killed"
+                kill_count += 1
 
 
-            # tell_story_mutant = story.tell(interpreter.Interpreter(mutant))
-            # assert isinstance(tell_story_mutant, interpreter.Interpreter)
+                # tell_story_mutant = story.tell(interpreter.Interpreter(mutant))
+                # assert isinstance(tell_story_mutant, interpreter.Interpreter)
 
-            # except exceptions.NonDeterminismError as err:
-            #     print(err)
-            #     print(mutant.mutator_type)
-            #     print(mutant.states)
+                # except exceptions.NonDeterminismError as err:
+                #     print(err)
+                #     print(mutant.mutator_type)
+                #     print(mutant.states)
 
-            # if tell_story_original.trace != tell_story_mutant.trace or tell_story_original.configuration != tell_story_mutant.configuration or tell_story_original.context != tell_story_mutant.context:
-            #     self.mutant_status[mutant] = "Killed"
-            #     kill_count += 1
+                # if tell_story_original.trace != tell_story_mutant.trace or tell_story_original.configuration != tell_story_mutant.configuration or tell_story_original.context != tell_story_mutant.context:
+                #     self.mutant_status[mutant] = "Killed"
+                #     kill_count += 1
 
         return kill_count
 
