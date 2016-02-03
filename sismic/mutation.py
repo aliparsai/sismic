@@ -230,3 +230,32 @@ class WrongStartingState(Mutator):
                     mutants.append(new_mutant)
 
         return mutants
+
+
+class EventMissing(Mutator):
+    def __init__(self, statechart: model.Statechart = None):
+        super().__init__(statechart=statechart)
+
+    def mutate(self) -> list:
+        mutants = list()
+        event_list = self.statechart.events_for()
+
+        for event in event_list:
+            new_mutant = self.separate_instance()
+            assert isinstance(new_mutant, model.Statechart)
+
+            new_mutant.mutator_type = self.mutator_type
+
+            try:
+                for transition in new_mutant.transitions_with(event):
+                    transition.event = None
+
+                new_mutant.validate()
+
+            except:
+                continue
+
+            mutants.append(new_mutant)
+
+        return mutants
+
