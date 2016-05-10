@@ -4,7 +4,14 @@ from sismic import mutation
 import random
 import itertools
 
+from sismic.model.steps import MacroStep
+from sismic.interpreter import Interpreter
+
+from typing import List, Generator, Union, Tuple, Iterable, Sequence
+
 __all__ = ['Pause', 'Story', 'random_stories_generator', 'story_from_trace']
+
+Tellable = Union[Event, 'Pause']
 
 
 class Pause:
@@ -13,11 +20,11 @@ class Pause:
 
     :param duration: the duration of this pause
     """
-    def __init__(self, duration: int):
+    def __init__(self, duration: float) -> None:
         self._duration = duration
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         """
         The duration of this pause
         """
@@ -35,24 +42,27 @@ class Story(list):
     A story is a sequence of *Event* and *Pause*.
 
     """
-    def tell(self, interpreter, *args, **kwargs):
+    def tell(self, interpreter: Interpreter, *args, **kwargs) -> List[MacroStep]:
         """
         Tells the whole story to the interpreter.
 
         :param interpreter: an interpreter instance
         :param args: additional positional arguments that are passed to *interpreter.execute*.
         :param kwargs: additional keywords arguments that are passed to *interpreter.execute*.
-        :return: the interpreter, to chain calls
+        :return: the resulting trace of execution (a list of *MacroStep*)
         """
+        trace = []  # type: List[MacroStep]
         for item in self:
             if isinstance(item, Event):
                 interpreter.queue(item)
             elif isinstance(item, Pause):
                 interpreter.time += item.duration
-            interpreter.execute(*args, **kwargs)
-        return interpreter
+            step = interpreter.execute(*args, **kwargs)
+            if step:
+                trace.extend(step)
+        return trace
 
-    def tell_by_step(self, interpreter, *args, **kwargs):
+    def tell_by_step(self, interpreter, *args, **kwargs) -> Generator[Tuple[Tellable, List[MacroStep]], None, None]:
         """
         Tells the story to the interpreter, step by step.
         This method returns a generator which yields the event or the pause that was told to the interpreter and
@@ -74,7 +84,7 @@ class Story(list):
         return 'Story({})'.format(super().__repr__())
 
 
-def random_stories_generator(items, length: int=None, number: int=None):
+def random_stories_generator(items: Sequence[Union[Event, Pause]], length: int=None, number: int=None) -> Generator[Story, None, None]:
     """
     A generator that returns random stories whose elements come from *items*.
     Parameter *items* can be any iterable containing events and/or pauses.
@@ -136,7 +146,8 @@ def random_stories_generator_using_mutation(statechart, items, minimum_length: i
     return story_list
 
 
-def story_from_trace(trace: list) -> Story:
+# def story_from_trace(trace: list) -> Story:
+def story_from_trace(trace: Iterable[MacroStep]) -> Story:
     """
     Return a story that is built upon the given trace (a list of macro steps).
 
@@ -150,7 +161,7 @@ def story_from_trace(trace: list) -> Story:
     :return: A story
     """
     story = Story()
-    time = 0
+    time = 0  # type: float
 
     for macrostep in trace:
         if macrostep.time > time:
@@ -160,4 +171,3 @@ def story_from_trace(trace: list) -> Story:
         if macrostep.event and not isinstance(macrostep.event, InternalEvent):
             story.append(macrostep.event)
     return story
-

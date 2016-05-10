@@ -1,4 +1,4 @@
-from behave import *
+from behave import given, when, then  # type: ignore
 from sismic.io import import_from_yaml
 from sismic.interpreter import Interpreter
 from sismic.model import Event
@@ -27,18 +27,23 @@ def reproduce_scenario(context, scenario):
 @when('I repeat step "{step}" {repeat:d} times')
 def repeat_step(context, step, repeat):
     keyword = step.split(' ', 1)[0].lower()
-    assert keyword in ['given', 'when', 'and', 'but', 'then'], 'Step {} should start with a supported keyword'.format(step)
+    assert keyword in ['given', 'when', 'and', 'but', 'then'], \
+        'Step {} should start with a supported keyword'.format(step)
 
-    for x in range(repeat):
+    for _ in range(repeat):
         context.execute_steps(step)
 
 
 # #################### CONFIGURATION
-def _execute_statechart(context, force_execution=False):
+def _execute_statechart(context, force_execution=False, execute_once=False):
     if context._automatic_execution or force_execution:
-        context._events = []
-        steps = context._interpreter.execute()
-        context._steps.append(steps)
+        if execute_once:
+            steps = [context._interpreter.execute_once()]
+        else:
+            steps = context._interpreter.execute()
+
+        for step in steps:
+            context._steps.append(step)
 
 
 @given('I disable automatic execution')
@@ -60,21 +65,20 @@ def load_statechart(context, path):
     context._steps = []
     context._events = []
     context._automatic_execution = True
-    context._interpreter.bind(lambda e: context._events.append(e))
+    context._interpreter.bind(context._events.append)
+    context._interpreter.execute_once()  # init
 
 
 @given('I execute the statechart')
 @when('I execute the statechart')
 def execute_statechart(context):
-    steps = context._interpreter.execute()
-    context._steps.append(steps)
+    _execute_statechart(context, force_execution=True)
 
 
 @given('I execute once the statechart')
 @when('I execute once the statechart')
 def execute_once_statechart(context):
-    step = context._interpreter.execute_once()
-    context._steps.append([step])
+    _execute_statechart(context, force_execution=True, execute_once=True)
 
 
 # #################### STATECHART
@@ -100,7 +104,7 @@ def send_event(context, event_name, parameter=None, value=None):
 @given('I wait {seconds:g} second')
 @when('I wait {seconds:g} seconds')
 @when('I wait {seconds:g} second')
-def wait_seconds(context, seconds):
+def wait_seconds_once(context, seconds):
     context._interpreter.time += seconds
     _execute_statechart(context)
 
@@ -110,9 +114,8 @@ def wait_seconds(context, seconds):
 @when('I wait {seconds:g} seconds {repeat:d} times')
 @when('I wait {seconds:g} second {repeat:d} times')
 def wait_seconds(context, seconds, repeat):
-    for i in range(repeat):
-        context._interpreter.time += seconds
-        _execute_statechart(context)
+    for _ in range(repeat):
+        wait_seconds_once(context, seconds)
 
 
 @given('I set variable {variable_name} to {value}')
@@ -181,4 +184,5 @@ def expression_holds(context, expression):
 
 @then('the statechart is in a final configuration')
 def final_configuration(context):
-    assert context._interpreter.final, 'The statechart is not in a final configuration: {}'.format(context._interpreter.configuration)
+    assert context._interpreter.final, \
+        'The statechart is not in a final configuration: {}'.format(context._interpreter.configuration)
